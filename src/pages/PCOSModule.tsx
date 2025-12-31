@@ -22,22 +22,28 @@ type Step =
 
 type RiskLevel = "low" | "medium" | "high";
 
-/* ---------------- ML API (ENV SAFE) ---------------- */
+/* ---------------- ML API ---------------- */
 const PCOS_API = import.meta.env.VITE_PCOS_API_URL;
 
 async function predictPCOS(payload: any) {
+  if (!PCOS_API) {
+    throw new Error("PCOS API URL not configured");
+  }
+
   const res = await fetch(`${PCOS_API}/predict-pcos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
+  const text = await res.text();
+
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
+    console.error("PCOS API error:", text);
+    throw new Error(text || "Prediction failed");
   }
 
-  return res.json();
+  return JSON.parse(text);
 }
 
 /* ---------------- QUESTIONS ---------------- */
@@ -185,30 +191,28 @@ export default function PCOSModule() {
 
       setMlResult(result);
 
-      const { error } = await supabase.from("health_assessments").insert({
+      await supabase.from("health_assessments").insert({
         user_id: user.id,
         assessment_type: "pcos",
         risk_score: result.risk_score ?? score,
-        risk_category: result.risk_level?.toLowerCase() ?? riskLevel,
+        risk_category:
+          result.risk_level?.toLowerCase() ?? riskLevel,
         responses: nextAnswers,
       });
 
-      if (error) {
-        console.error(error);
-        toast({ title: "Failed to save result", variant: "destructive" });
-        return;
-      }
-
       toast({ title: "PCOS assessment completed" });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast({ title: "PCOS prediction failed", variant: "destructive" });
+      toast({
+        title: "PCOS prediction failed",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- RESET ---------------- */
   const restart = () => {
     setAnswers({});
     setQIndex(0);
@@ -222,7 +226,6 @@ export default function PCOSModule() {
       <Header />
 
       <main className="pt-24 pb-16 max-w-4xl mx-auto px-4">
-        {/* EDUCATION */}
         {step === "education" && (
           <div className="text-center py-16">
             <Activity className="w-16 h-16 mx-auto mb-4 text-accent" />
@@ -238,7 +241,6 @@ export default function PCOSModule() {
           </div>
         )}
 
-        {/* QUESTIONNAIRE */}
         {step === "questionnaire" && (
           <>
             <h2 className="text-2xl font-bold mb-6">
@@ -249,6 +251,7 @@ export default function PCOSModule() {
                 key={i}
                 className="w-full mb-3"
                 onClick={() => handleAnswer(opt.score)}
+                disabled={loading}
               >
                 {opt.label}
               </Button>
@@ -256,7 +259,6 @@ export default function PCOSModule() {
           </>
         )}
 
-        {/* RESULTS */}
         {step === "results" && (
           <>
             <RiskGauge
@@ -270,52 +272,9 @@ export default function PCOSModule() {
                   : "text-destructive"
               }
             />
-
-            <div className="mt-4 p-4 rounded-xl bg-muted/60 text-center">
-              {mlResult?.risk_level === "Low" && (
-                <p className="text-teal">
-                  Low risk – lifestyle care suggested
-                </p>
-              )}
-              {mlResult?.risk_level === "Medium" && (
-                <p className="text-accent">
-                  Medium risk – doctor consultation advised
-                </p>
-              )}
-              {mlResult?.risk_level === "High" && (
-                <p className="text-destructive">
-                  High risk – strong PCOS indicators
-                </p>
-              )}
-            </div>
-
             <RiskChart factors={riskFactors} />
-
-            <Button
-              className="mt-6 w-full"
-              onClick={() => setStep("recommendations")}
-            >
-              View Recommendations
-            </Button>
-          </>
-        )}
-
-        {/* RECOMMENDATIONS */}
-        {step === "recommendations" && (
-          <>
-            <Recommendations riskLevel={riskLevel} type="pcos" />
-            <Button variant="outline" className="mt-6" onClick={restart}>
+            <Button className="mt-6 w-full" onClick={restart}>
               Start Again
-            </Button>
-          </>
-        )}
-
-        {/* DOCTORS */}
-        {step === "doctors" && (
-          <>
-            <NearbyDoctors specialty="gynecologist endocrinologist PCOS" />
-            <Button variant="outline" className="mt-6" onClick={restart}>
-              New Assessment
             </Button>
           </>
         )}
