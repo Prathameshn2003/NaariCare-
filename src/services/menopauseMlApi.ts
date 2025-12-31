@@ -4,15 +4,27 @@ export type MenopauseMLResponse = {
   probabilities: Record<string, number>;
 };
 
-export async function predictMenopauseML(payload: any): Promise<MenopauseMLResponse> {
-  const res = await fetch("http://localhost:8000/predict-menopause", {
+// ✅ SAFE API URL (ENV + FALLBACK)
+const MENOPAUSE_API_URL =
+  import.meta.env.VITE_MENOPAUSE_API_URL ||
+  "https://menopause-ml-production.up.railway.app";
+
+export async function predictMenopauseML(
+  payload: any
+): Promise<MenopauseMLResponse> {
+  console.log("Calling Menopause API:", MENOPAUSE_API_URL);
+
+  const res = await fetch(`${MENOPAUSE_API_URL}/predict-menopause`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    throw new Error("ML API failed");
+    const text = await res.text();
+    throw new Error(`ML API failed (${res.status}): ${text}`);
   }
 
   return res.json();

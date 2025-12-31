@@ -14,17 +14,26 @@ import { toast } from "@/hooks/use-toast";
 type Step = "education" | "questionnaire" | "results" | "recommendations";
 type RiskLevel = "low" | "medium" | "high";
 
-/* ---------------- API ---------------- */
-const MENOPAUSE_API = import.meta.env.VITE_MENOPAUSE_API_URL;
+/* ---------------- API (SAFE FOR VERCEL) ---------------- */
+const MENOPAUSE_API =
+  import.meta.env.VITE_MENOPAUSE_API_URL ||
+  "https://menopause-ml-production.up.railway.app";
 
+/* ---------------- ML CALL ---------------- */
 async function predictMenopauseML(payload: Record<string, number>) {
+  console.log("Calling Menopause API:", MENOPAUSE_API);
+
   const res = await fetch(`${MENOPAUSE_API}/predict-menopause`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error("Prediction failed");
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Prediction failed (${res.status}): ${err}`);
+  }
+
   return res.json();
 }
 
