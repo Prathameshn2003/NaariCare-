@@ -14,10 +14,14 @@ import { toast } from "@/hooks/use-toast";
 type Step = "education" | "questionnaire" | "results" | "recommendations";
 type RiskLevel = "low" | "medium" | "high";
 
-/* ---------------- API (SAFE FOR VERCEL) ---------------- */
-const MENOPAUSE_API =
-  import.meta.env.VITE_MENOPAUSE_API_URL ||
-  "https://menopause-ml-production.up.railway.app";
+/* ---------------- API (FINAL FIX) ---------------- */
+/**
+ * ✔ Production (Vercel)  → Railway
+ * ✔ Local development    → localhost
+ */
+const MENOPAUSE_API = import.meta.env.PROD
+  ? "https://menopause-ml-production.up.railway.app"
+  : import.meta.env.VITE_MENOPAUSE_API_URL || "http://localhost:8000";
 
 /* ---------------- ML CALL ---------------- */
 async function predictMenopauseML(payload: Record<string, number>) {
