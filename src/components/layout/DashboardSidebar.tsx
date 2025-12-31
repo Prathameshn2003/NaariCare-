@@ -50,8 +50,6 @@ const adminNavItems = [
   { title: "NGO Management", path: "/admin/ngos", icon: Building2 },
 ];
 
-/* ---------------- COMPONENT ---------------- */
-
 export const DashboardSidebar = ({
   isOpen,
   onClose,
@@ -97,8 +95,8 @@ export const DashboardSidebar = ({
           "lg:translate-x-0 lg:w-64 lg:shadow-none"
         )}
       >
-        {/* Logo */}
-        <div className="p-4 border-b">
+        {/* 1️⃣ Logo (fixed) */}
+        <div className="p-4 border-b shrink-0">
           <NavLink to="/" className="flex items-center gap-3">
             <img src="/favicon.png" className="w-9 h-9" />
             <span className="font-heading font-bold text-xl">
@@ -107,7 +105,7 @@ export const DashboardSidebar = ({
           </NavLink>
         </div>
 
-        {/* Navigation (scrollable area) */}
+        {/* 2️⃣ Scrollable navigation ONLY */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {userNavItems.map((item) => (
             <NavLink
@@ -147,8 +145,8 @@ export const DashboardSidebar = ({
           )}
         </nav>
 
-        {/* ✅ Sticky Logout Section (FIX) */}
-        <div className="border-t p-4 bg-background sticky bottom-0">
+        {/* 3️⃣ Logout section (FIXED & ALWAYS VISIBLE) */}
+        <div className="border-t p-4 shrink-0">
           <p className="text-sm font-medium truncate">
             {user?.user_metadata?.full_name || "User"}
           </p>
