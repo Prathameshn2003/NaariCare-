@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* NaariCare Brand Colors */
+    --background: 350 100% 99%;
+    --foreground: 200 18% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 200 18% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 18% 17%;
+
+    /* Soft Rose Pink */
+    --primary: 340 73% 85%;
+    --primary-foreground: 200 18% 17%;
+
+    /* Lavender Purple */
+    --secondary: 230 41% 85%;
+    --secondary-foreground: 200 18% 17%;
+
+    /* Muted Lavender */
+    --muted: 230 30% 94%;
+    --muted-foreground: 200 10% 45%;
+
+    /* Coral Accent */
+    --accent: 14 100% 70%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Teal Calm */
+    --teal: 168 44% 51%;
+    --teal-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 340 30% 90%;
+    --input: 340 30% 90%;
+    --ring: 340 73% 75%;
+
+    --radius: 1rem;
+
+    /* Custom NaariCare tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(340 73% 85%), hsl(230 41% 85%));
+    --gradient-hero: linear-gradient(180deg, hsl(350 100% 99%) 0%, hsl(340 60% 96%) 100%);
+    --gradient-card: linear-gradient(135deg, rgba(248, 187, 208, 0.15), rgba(197, 202, 233, 0.15));
+    --shadow-soft: 0 4px 20px -4px rgba(248, 187, 208, 0.3);
+    --shadow-glow: 0 0 40px rgba(248, 187, 208, 0.4);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 200 18% 10%;
+    --foreground: 350 50% 95%;
+
+    --card: 200 18% 14%;
+    --card-foreground: 350 50% 95%;
+
+    --popover: 200 18% 14%;
+    --popover-foreground: 350 50% 95%;
+
+    --primary: 340 60% 70%;
+    --primary-foreground: 200 18% 10%;
+
+    --secondary: 230 30% 30%;
+    --secondary-foreground: 350 50% 95%;
+
+    --muted: 200 15% 20%;
+    --muted-foreground: 200 10% 60%;
+
+    --accent: 14 80% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --teal: 168 44% 45%;
+    --teal-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 200 15% 25%;
+    --input: 200 15% 25%;
+    --ring: 340 60% 60%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(340 60% 30%), hsl(230 30% 25%));
+    --gradient-hero: linear-gradient(180deg, hsl(200 18% 10%) 0%, hsl(200 15% 15%) 100%);
+    --gradient-card: linear-gradient(135deg, rgba(248, 187, 208, 0.08), rgba(197, 202, 233, 0.08));
+    --shadow-soft: 0 4px 20px -4px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 40px rgba(248, 187, 208, 0.15);
+
+    --sidebar-background: 200 18% 12%;
+    --sidebar-foreground: 350 50% 95%;
+    --sidebar-primary: 340 60% 70%;
+    --sidebar-primary-foreground: 200 18% 10%;
+    --sidebar-accent: 200 15% 18%;
+    --sidebar-accent-foreground: 350 50% 95%;
+    --sidebar-border: 200 15% 20%;
+    --sidebar-ring: 340 60% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg;
+    background: var(--gradient-card);
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+  }
+
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .btn-glow {
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 3s ease-in-out infinite;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.6s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.4s ease-out forwards;
+  }
+
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
