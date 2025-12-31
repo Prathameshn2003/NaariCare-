@@ -25,6 +25,8 @@ interface DashboardSidebarProps {
   onClose: () => void;
 }
 
+/* ---------------- NAV ITEMS ---------------- */
+
 const userNavItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { title: "Menstrual Health", path: "/modules/menstrual", icon: Droplets },
@@ -48,6 +50,8 @@ const adminNavItems = [
   { title: "NGO Management", path: "/admin/ngos", icon: Building2 },
 ];
 
+/* ---------------- COMPONENT ---------------- */
+
 export const DashboardSidebar = ({
   isOpen,
   onClose,
@@ -59,7 +63,6 @@ export const DashboardSidebar = ({
   const handleSignOut = async () => {
     await signOut();
     navigate("/login", { replace: true });
-    onClose();
   };
 
   const isActive = (path: string) =>
@@ -104,7 +107,7 @@ export const DashboardSidebar = ({
           </NavLink>
         </div>
 
-        {/* Scrollable Nav */}
+        {/* Navigation (scrollable area) */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {userNavItems.map((item) => (
             <NavLink
@@ -144,8 +147,8 @@ export const DashboardSidebar = ({
           )}
         </nav>
 
-        {/* 🔒 FIXED LOGOUT (ALWAYS VISIBLE) */}
-        <div className="p-4 border-t">
+        {/* ✅ Sticky Logout Section (FIX) */}
+        <div className="border-t p-4 bg-background sticky bottom-0">
           <p className="text-sm font-medium truncate">
             {user?.user_metadata?.full_name || "User"}
           </p>
