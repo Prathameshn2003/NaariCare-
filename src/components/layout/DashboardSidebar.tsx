@@ -25,8 +25,6 @@ interface DashboardSidebarProps {
   onClose: () => void;
 }
 
-/* ---------------- NAV ITEMS ---------------- */
-
 const userNavItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { title: "Menstrual Health", path: "/modules/menstrual", icon: Droplets },
@@ -50,8 +48,6 @@ const adminNavItems = [
   { title: "NGO Management", path: "/admin/ngos", icon: Building2 },
 ];
 
-/* ---------------- COMPONENT ---------------- */
-
 export const DashboardSidebar = ({
   isOpen,
   onClose,
@@ -63,6 +59,7 @@ export const DashboardSidebar = ({
   const handleSignOut = async () => {
     await signOut();
     navigate("/login", { replace: true });
+    onClose();
   };
 
   const isActive = (path: string) =>
@@ -72,7 +69,7 @@ export const DashboardSidebar = ({
 
   return (
     <>
-      {/* ---------- Mobile Overlay ---------- */}
+      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -80,7 +77,7 @@ export const DashboardSidebar = ({
         />
       )}
 
-      {/* ---------- Sidebar ---------- */}
+      {/* Sidebar */}
       <aside
         className={cn(
           `
@@ -90,7 +87,6 @@ export const DashboardSidebar = ({
           bg-background
           border-r
           flex flex-col
-          overflow-y-auto
           transition-transform duration-300 ease-in-out
           shadow-xl
           `,
@@ -98,7 +94,7 @@ export const DashboardSidebar = ({
           "lg:translate-x-0 lg:w-64 lg:shadow-none"
         )}
       >
-        {/* ---------- Logo ---------- */}
+        {/* Logo */}
         <div className="p-4 border-b">
           <NavLink to="/" className="flex items-center gap-3">
             <img src="/favicon.png" className="w-9 h-9" />
@@ -108,8 +104,8 @@ export const DashboardSidebar = ({
           </NavLink>
         </div>
 
-        {/* ---------- Navigation ---------- */}
-        <nav className="flex-1 p-4 space-y-1">
+        {/* Scrollable Nav */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {userNavItems.map((item) => (
             <NavLink
               key={item.path}
@@ -127,12 +123,10 @@ export const DashboardSidebar = ({
             </NavLink>
           ))}
 
-          {/* ---------- Admin Section ---------- */}
           {isAdmin && (
             <div className="mt-6 pt-4 border-t">
               <p className="text-xs font-semibold uppercase mb-3 flex items-center gap-2 px-4">
-                <Shield className="w-3 h-3" />
-                Admin
+                <Shield className="w-3 h-3" /> Admin
               </p>
 
               {adminNavItems.map((item) => (
@@ -150,7 +144,7 @@ export const DashboardSidebar = ({
           )}
         </nav>
 
-        {/* ---------- User Info ---------- */}
+        {/* 🔒 FIXED LOGOUT (ALWAYS VISIBLE) */}
         <div className="p-4 border-t">
           <p className="text-sm font-medium truncate">
             {user?.user_metadata?.full_name || "User"}
