@@ -7,20 +7,12 @@ import { RiskChart } from "@/components/health/RiskChart";
 import { NearbyDoctors } from "@/components/health/NearbyDoctors";
 import { HealthDisclaimer } from "@/components/health/HealthDisclaimer";
 import { Recommendations } from "@/components/health/Recommendations";
-import {
-  Activity,
-  AlertCircle,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
-  Info,
-  Lightbulb,
-  Sparkles,
-} from "lucide-react";
+import { Activity, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
+/* ---------------- TYPES ---------------- */
 type Step =
   | "education"
   | "questionnaire"
@@ -28,22 +20,27 @@ type Step =
   | "recommendations"
   | "doctors";
 
-/* ---------------------------------------
-   ML API
---------------------------------------- */
+type RiskLevel = "low" | "medium" | "high";
+
+/* ---------------- ML API (ENV SAFE) ---------------- */
+const PCOS_API = import.meta.env.VITE_PCOS_API_URL;
+
 async function predictPCOS(payload: any) {
-  const res = await fetch("http://localhost:8001/predict-pcos", {
+  const res = await fetch(`${PCOS_API}/predict-pcos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("PCOS ML API error");
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
   return res.json();
 }
 
-/* ---------------------------------------
-   QUESTIONS (FIXED)
---------------------------------------- */
+/* ---------------- QUESTIONS ---------------- */
 const questions = [
   {
     id: 1,
@@ -51,8 +48,8 @@ const questions = [
     factor: "Cycle Regularity",
     options: [
       { label: "Very regular (21–35 days)", score: 0 },
-      { label: "Slightly irregular (varies by 1–2 weeks)", score: 1 },
-      { label: "Very irregular (unpredictable)", score: 2 },
+      { label: "Slightly irregular", score: 1 },
+      { label: "Very irregular", score: 2 },
       { label: "Absent for 3+ months", score: 3 },
     ],
   },
@@ -62,9 +59,9 @@ const questions = [
     factor: "Hair Growth",
     options: [
       { label: "No excess hair", score: 0 },
-      { label: "Mild (few hairs)", score: 1 },
-      { label: "Moderate (needs removal)", score: 2 },
-      { label: "Severe (significant growth)", score: 3 },
+      { label: "Mild", score: 1 },
+      { label: "Moderate", score: 2 },
+      { label: "Severe", score: 3 },
     ],
   },
   {
@@ -75,18 +72,18 @@ const questions = [
       { label: "Clear skin", score: 0 },
       { label: "Occasional acne", score: 1 },
       { label: "Persistent acne", score: 2 },
-      { label: "Severe cystic acne", score: 3 },
+      { label: "Severe acne", score: 3 },
     ],
   },
   {
     id: 4,
     text: "Have you experienced weight gain?",
-    factor: "Weight",
+    factor: "Weight Gain",
     options: [
       { label: "No weight gain", score: 0 },
-      { label: "Mild (1–5 kg)", score: 1 },
-      { label: "Moderate (5–15 kg)", score: 2 },
-      { label: "Significant (>15 kg)", score: 3 },
+      { label: "Mild", score: 1 },
+      { label: "Moderate", score: 2 },
+      { label: "Significant", score: 3 },
     ],
   },
   {
@@ -94,10 +91,10 @@ const questions = [
     text: "Family history of PCOS or diabetes?",
     factor: "Family History",
     options: [
-      { label: "No family history", score: 0 },
-      { label: "Diabetes in family", score: 1 },
-      { label: "PCOS in family", score: 2 },
-      { label: "Both PCOS & diabetes", score: 3 },
+      { label: "No history", score: 0 },
+      { label: "Diabetes", score: 1 },
+      { label: "PCOS", score: 2 },
+      { label: "Both", score: 3 },
     ],
   },
   {
@@ -124,24 +121,24 @@ const questions = [
   },
 ];
 
+/* ---------------- COMPONENT ---------------- */
 export default function PCOSModule() {
   const { user } = useAuth();
 
-  const [currentStep, setCurrentStep] = useState<Step>("education");
+  const [step, setStep] = useState<Step>("education");
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [qIndex, setQIndex] = useState(0);
   const [mlResult, setMlResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  /* ---------------------------------------
-     SCORE (UI ONLY)
-  --------------------------------------- */
+  /* ---------------- UI SCORE ---------------- */
   const score = useMemo(() => {
     const total = Object.values(answers).reduce((a, b) => a + b, 0);
     return Math.round((total / (questions.length * 3)) * 100);
   }, [answers]);
 
-  const riskLevel = score < 30 ? "low" : score < 60 ? "medium" : "high";
+  const riskLevel: RiskLevel =
+    score < 30 ? "low" : score < 60 ? "medium" : "high";
 
   const riskFactors = questions.map((q) => ({
     name: q.factor,
@@ -149,114 +146,118 @@ export default function PCOSModule() {
     maxValue: 3,
   }));
 
-  /* ---------------------------------------
-     ANSWER HANDLER
-  --------------------------------------- */
-  const handleAnswer = async (scoreValue: number) => {
-    const newAnswers = {
-      ...answers,
-      [questions[currentQuestion].id]: scoreValue,
-    };
-    setAnswers(newAnswers);
-
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion((q) => q + 1);
+  /* ---------------- ANSWER HANDLER ---------------- */
+  const handleAnswer = async (value: number) => {
+    if (!user) {
+      toast({ title: "Please login first", variant: "destructive" });
       return;
     }
 
-    setCurrentStep("results");
+    const nextAnswers = { ...answers, [questions[qIndex].id]: value };
+    setAnswers(nextAnswers);
+
+    if (qIndex < questions.length - 1) {
+      setQIndex((i) => i + 1);
+      return;
+    }
+
+    setStep("results");
     setLoading(true);
 
-    const payload = {
-      age: 24,
-      weight: 62,
-      bmi: 25.3,
-      cycle: newAnswers[1] >= 2 ? 0 : 1,
-      cycle_length: 35,
-      weight_gain: newAnswers[4] >= 2 ? 1 : 0,
-      hair_growth: newAnswers[2] >= 2 ? 1 : 0,
-      skin_darkening: newAnswers[6] >= 2 ? 1 : 0,
-      hair_loss: newAnswers[7] >= 2 ? 1 : 0,
-      pimples: newAnswers[3] >= 2 ? 1 : 0,
-      fast_food: 1,
-      regular_exercise: 0,
-      follicle_left: 6,
-      follicle_right: 7,
-      endometrium: 8.5,
-    };
-
     try {
-      const prediction = await predictPCOS(payload);
-      setMlResult(prediction);
-
-      await supabase.from("health_assessments").insert({
-        user_id: user?.id,
-        assessment_type: "pcos",
-        risk_score: prediction.risk_score,
-        risk_category: prediction.risk_level.toLowerCase(),
-        responses: newAnswers,
-        recommendations: prediction,
+      const result = await predictPCOS({
+        age: 24,
+        weight: 62,
+        bmi: 25.3,
+        cycle: nextAnswers[1] >= 2 ? 0 : 1,
+        cycle_length: 35,
+        weight_gain: nextAnswers[4] >= 2 ? 1 : 0,
+        hair_growth: nextAnswers[2] >= 2 ? 1 : 0,
+        skin_darkening: nextAnswers[6] >= 2 ? 1 : 0,
+        hair_loss: nextAnswers[7] >= 2 ? 1 : 0,
+        pimples: nextAnswers[3] >= 2 ? 1 : 0,
+        fast_food: 1,
+        regular_exercise: 0,
+        follicle_left: 6,
+        follicle_right: 7,
+        endometrium: 8.5,
       });
+
+      setMlResult(result);
+
+      const { error } = await supabase.from("health_assessments").insert({
+        user_id: user.id,
+        assessment_type: "pcos",
+        risk_score: result.risk_score ?? score,
+        risk_category: result.risk_level?.toLowerCase() ?? riskLevel,
+        responses: nextAnswers,
+      });
+
+      if (error) {
+        console.error(error);
+        toast({ title: "Failed to save result", variant: "destructive" });
+        return;
+      }
 
       toast({ title: "PCOS assessment completed" });
     } catch (err) {
+      console.error(err);
       toast({ title: "PCOS prediction failed", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------------------------------
-     RESTART
-  --------------------------------------- */
-  const restartAssessment = () => {
+  /* ---------------- RESET ---------------- */
+  const restart = () => {
     setAnswers({});
-    setCurrentQuestion(0);
+    setQIndex(0);
     setMlResult(null);
-    setCurrentStep("education");
+    setStep("education");
   };
 
-  /* ---------------------------------------
-     UI
-  --------------------------------------- */
+  /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="pt-24 pb-16 container mx-auto px-4 max-w-4xl">
-        {currentStep === "education" && (
+      <main className="pt-24 pb-16 max-w-4xl mx-auto px-4">
+        {/* EDUCATION */}
+        {step === "education" && (
           <div className="text-center py-16">
             <Activity className="w-16 h-16 mx-auto mb-4 text-accent" />
             <h1 className="text-3xl font-bold mb-4">PCOS Risk Assessment</h1>
             <p className="text-muted-foreground mb-8">
-              Answer a few questions to assess your PCOS risk using AI.
+              Answer a few questions to assess your PCOS risk.
             </p>
-            <Button size="lg" onClick={() => setCurrentStep("questionnaire")}>
-              <Sparkles className="w-4 h-4 mr-2" />
+            <Button size="lg" onClick={() => setStep("questionnaire")}>
+              <Sparkles className="mr-2 h-4 w-4" />
               Start Assessment
             </Button>
             <HealthDisclaimer />
           </div>
         )}
 
-        {currentStep === "questionnaire" && (
+        {/* QUESTIONNAIRE */}
+        {step === "questionnaire" && (
           <>
             <h2 className="text-2xl font-bold mb-6">
-              {questions[currentQuestion].text}
+              {questions[qIndex].text}
             </h2>
-            {questions[currentQuestion].options.map((option, i) => (
+            {questions[qIndex].options.map((opt, i) => (
               <Button
                 key={i}
                 className="w-full mb-3"
-                onClick={() => handleAnswer(option.score)}
+                onClick={() => handleAnswer(opt.score)}
               >
-                {option.label}
+                {opt.label}
               </Button>
             ))}
           </>
         )}
 
-        {currentStep === "results" && (
+        {/* RESULTS */}
+        {step === "results" && (
           <>
             <RiskGauge
               score={mlResult?.risk_score ?? score}
@@ -269,30 +270,52 @@ export default function PCOSModule() {
                   : "text-destructive"
               }
             />
+
+            <div className="mt-4 p-4 rounded-xl bg-muted/60 text-center">
+              {mlResult?.risk_level === "Low" && (
+                <p className="text-teal">
+                  Low risk – lifestyle care suggested
+                </p>
+              )}
+              {mlResult?.risk_level === "Medium" && (
+                <p className="text-accent">
+                  Medium risk – doctor consultation advised
+                </p>
+              )}
+              {mlResult?.risk_level === "High" && (
+                <p className="text-destructive">
+                  High risk – strong PCOS indicators
+                </p>
+              )}
+            </div>
+
             <RiskChart factors={riskFactors} />
+
             <Button
-              className="mt-6"
-              onClick={() => setCurrentStep("recommendations")}
+              className="mt-6 w-full"
+              onClick={() => setStep("recommendations")}
             >
               View Recommendations
             </Button>
           </>
         )}
 
-        {currentStep === "recommendations" && (
+        {/* RECOMMENDATIONS */}
+        {step === "recommendations" && (
           <>
             <Recommendations riskLevel={riskLevel} type="pcos" />
-            <Button variant="outline" className="mt-6" onClick={restartAssessment}>
+            <Button variant="outline" className="mt-6" onClick={restart}>
               Start Again
             </Button>
           </>
         )}
 
-        {currentStep === "doctors" && (
+        {/* DOCTORS */}
+        {step === "doctors" && (
           <>
             <NearbyDoctors specialty="gynecologist endocrinologist PCOS" />
-            <Button variant="outline" className="mt-6" onClick={restartAssessment}>
-              Start New Assessment
+            <Button variant="outline" className="mt-6" onClick={restart}>
+              New Assessment
             </Button>
           </>
         )}
