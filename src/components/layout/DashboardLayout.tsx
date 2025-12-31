@@ -9,7 +9,7 @@ interface DashboardLayoutProps {
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 🔒 Lock body scroll on mobile when sidebar is open
+  // Lock body scroll on mobile when sidebar is open
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? "hidden" : "";
     return () => {
@@ -18,10 +18,12 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   }, [sidebarOpen]);
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen bg-background">
 
-      {/* Top Navbar */}
-      <DashboardNavbar onMenuClick={() => setSidebarOpen(true)} />
+      {/* Navbar → TOGGLE sidebar */}
+      <DashboardNavbar
+        onMenuClick={() => setSidebarOpen(prev => !prev)}
+      />
 
       {/* Sidebar */}
       <DashboardSidebar
@@ -30,19 +32,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       />
 
       {/* Main Content */}
-      <main
-        className={`
-          pt-16
-          lg:pl-64
-          transition-opacity
-          duration-200
-          ${
-            sidebarOpen
-              ? "opacity-0 pointer-events-none lg:opacity-100 lg:pointer-events-auto"
-              : ""
-          }
-        `}
-      >
+      <main className="pt-16 lg:pl-64">
         <div className="min-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="container mx-auto px-4 py-6 lg:py-8 max-w-7xl">
             {children}

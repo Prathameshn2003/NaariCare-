@@ -25,6 +25,8 @@ interface DashboardSidebarProps {
   onClose: () => void;
 }
 
+/* ---------------- NAV ITEMS ---------------- */
+
 const userNavItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { title: "Menstrual Health", path: "/modules/menstrual", icon: Droplets },
@@ -48,6 +50,8 @@ const adminNavItems = [
   { title: "NGO Management", path: "/admin/ngos", icon: Building2 },
 ];
 
+/* ---------------- COMPONENT ---------------- */
+
 export const DashboardSidebar = ({
   isOpen,
   onClose,
@@ -68,7 +72,7 @@ export const DashboardSidebar = ({
 
   return (
     <>
-      {/* Overlay */}
+      {/* ---------- Mobile Overlay ---------- */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -76,25 +80,25 @@ export const DashboardSidebar = ({
         />
       )}
 
-      {/* Sidebar */}
+      {/* ---------- Sidebar ---------- */}
       <aside
         className={cn(
           `
           fixed top-16 left-0 z-50
           h-[calc(100vh-4rem)]
-          w-[85vw] sm:w-64
+          w-[78vw] max-w-[280px]
           bg-background
           border-r
           flex flex-col
           overflow-y-auto
-          transition-transform
-          shadow-2xl
+          transition-transform duration-300 ease-in-out
+          shadow-xl
           `,
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:w-64 lg:shadow-none"
         )}
       >
-        {/* Logo */}
+        {/* ---------- Logo ---------- */}
         <div className="p-4 border-b">
           <NavLink to="/" className="flex items-center gap-3">
             <img src="/favicon.png" className="w-9 h-9" />
@@ -104,7 +108,7 @@ export const DashboardSidebar = ({
           </NavLink>
         </div>
 
-        {/* Navigation */}
+        {/* ---------- Navigation ---------- */}
         <nav className="flex-1 p-4 space-y-1">
           {userNavItems.map((item) => (
             <NavLink
@@ -112,7 +116,7 @@ export const DashboardSidebar = ({
               to={item.path}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition",
                 isActive(item.path)
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-muted-foreground hover:bg-muted"
@@ -123,11 +127,12 @@ export const DashboardSidebar = ({
             </NavLink>
           ))}
 
-          {/* Admin only */}
+          {/* ---------- Admin Section ---------- */}
           {isAdmin && (
             <div className="mt-6 pt-4 border-t">
-              <p className="text-xs font-semibold uppercase mb-3 flex items-center gap-2 px-3">
-                <Shield className="w-3 h-3" /> Admin
+              <p className="text-xs font-semibold uppercase mb-3 flex items-center gap-2 px-4">
+                <Shield className="w-3 h-3" />
+                Admin
               </p>
 
               {adminNavItems.map((item) => (
@@ -135,7 +140,7 @@ export const DashboardSidebar = ({
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-muted"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm hover:bg-muted"
                 >
                   <item.icon className="w-5 h-5" />
                   {item.title}
@@ -145,7 +150,7 @@ export const DashboardSidebar = ({
           )}
         </nav>
 
-        {/* User Info */}
+        {/* ---------- User Info ---------- */}
         <div className="p-4 border-t">
           <p className="text-sm font-medium truncate">
             {user?.user_metadata?.full_name || "User"}
@@ -159,7 +164,8 @@ export const DashboardSidebar = ({
             className="w-full justify-start gap-3 text-destructive"
             onClick={handleSignOut}
           >
-            <LogOut className="w-5 h-5" /> Logout
+            <LogOut className="w-5 h-5" />
+            Logout
           </Button>
         </div>
       </aside>
