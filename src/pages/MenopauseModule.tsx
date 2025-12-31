@@ -14,21 +14,17 @@ import { toast } from "@/hooks/use-toast";
 type Step = "education" | "questionnaire" | "results" | "recommendations";
 type RiskLevel = "low" | "medium" | "high";
 
-/* ---------------- ML API (ENV SAFE) ---------------- */
+/* ---------------- API ---------------- */
 const MENOPAUSE_API = import.meta.env.VITE_MENOPAUSE_API_URL;
 
-async function predictMenopauseML(payload: any) {
+async function predictMenopauseML(payload: Record<string, number>) {
   const res = await fetch(`${MENOPAUSE_API}/predict-menopause`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
-
+  if (!res.ok) throw new Error("Prediction failed");
   return res.json();
 }
 
@@ -50,7 +46,6 @@ export default function MenopauseModule() {
   const [step, setStep] = useState<Step>("education");
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [qIndex, setQIndex] = useState(0);
-  const [mlResult, setMlResult] = useState<any>(null);
 
   /* ---------------- SCORE ---------------- */
   const score = useMemo(() => {
@@ -61,6 +56,13 @@ export default function MenopauseModule() {
   const riskLevel: RiskLevel =
     score < 30 ? "low" : score < 60 ? "medium" : "high";
 
+  const gaugeColor =
+    riskLevel === "low"
+      ? "text-teal"
+      : riskLevel === "medium"
+      ? "text-accent"
+      : "text-primary";
+
   /* ---------------- ANSWER HANDLER ---------------- */
   const handleAnswer = async (value: number) => {
     if (!user) {
@@ -68,11 +70,12 @@ export default function MenopauseModule() {
       return;
     }
 
-    const nextAnswers = { ...answers, [questions[qIndex].id]: value };
+    const currentQuestionId = questions[qIndex].id;
+    const nextAnswers = { ...answers, [currentQuestionId]: value };
     setAnswers(nextAnswers);
 
     if (qIndex < questions.length - 1) {
-      setQIndex((i) => i + 1);
+      setQIndex(qIndex + 1);
       return;
     }
 
@@ -80,7 +83,7 @@ export default function MenopauseModule() {
 
     try {
       const result = await predictMenopauseML({
-        age: 48,
+        age: nextAnswers[1] ?? 48,
         estrogen: 40,
         fsh: 20,
         years_since_last_period: nextAnswers[2] === 3 ? 1.2 : 0.2,
@@ -93,21 +96,15 @@ export default function MenopauseModule() {
         joint_pain: nextAnswers[7] >= 2 ? 1 : 0,
       });
 
-      setMlResult(result);
-
       const { error } = await supabase.from("health_assessments").insert({
         user_id: user.id,
         assessment_type: "menopause",
-        risk_score: result.confidence ?? score,
+        risk_score: result.confidence,
         risk_category: riskLevel,
         responses: nextAnswers,
       });
 
-      if (error) {
-        console.error("Supabase error:", error);
-        toast({ title: "Failed to save result", variant: "destructive" });
-        return;
-      }
+      if (error) throw error;
 
       toast({ title: "Assessment completed successfully" });
     } catch (err) {
@@ -122,16 +119,12 @@ export default function MenopauseModule() {
       <Header />
 
       <main className="pt-32 pb-16 max-w-3xl mx-auto px-4">
-        {/* EDUCATION */}
         {step === "education" && (
           <div className="text-center py-16">
             <Thermometer className="w-14 h-14 mx-auto text-teal" />
             <h1 className="text-3xl font-bold mt-4">
               Menopause Health Assessment
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Answer a few questions to understand your menopause risk.
-            </p>
             <Button className="mt-6" onClick={() => setStep("questionnaire")}>
               <Heart className="mr-2 h-4 w-4" /> Start Assessment
             </Button>
@@ -139,7 +132,6 @@ export default function MenopauseModule() {
           </div>
         )}
 
-        {/* QUESTIONNAIRE */}
         {step === "questionnaire" && (
           <>
             <h2 className="text-xl font-bold mb-6">
@@ -157,38 +149,18 @@ export default function MenopauseModule() {
           </>
         )}
 
-        {/* RESULTS */}
         {step === "results" && (
           <>
             <RiskGauge
               score={score}
               label="Menopause Risk"
-              color={
-                riskLevel === "low"
-                  ? "text-teal"
-                  : riskLevel === "medium"
-                  ? "text-accent"
-                  : "text-primary"
-              }
+              color={gaugeColor}
             />
 
-            {/* USER FRIENDLY MEANING */}
             <div className="mt-4 p-4 rounded-xl bg-muted/60 text-center">
-              {riskLevel === "low" && (
-                <p className="text-teal font-medium">
-                  Low risk – mild or early symptoms
-                </p>
-              )}
-              {riskLevel === "medium" && (
-                <p className="text-accent font-medium">
-                  Moderate risk – consider consulting a doctor
-                </p>
-              )}
-              {riskLevel === "high" && (
-                <p className="text-primary font-medium">
-                  High risk – medical advice recommended
-                </p>
-              )}
+              {riskLevel === "low" && <p className="text-teal">Low risk – mild symptoms</p>}
+              {riskLevel === "medium" && <p className="text-accent">Moderate risk – consult a doctor</p>}
+              {riskLevel === "high" && <p className="text-primary">High risk – medical advice recommended</p>}
             </div>
 
             <Button
@@ -200,7 +172,6 @@ export default function MenopauseModule() {
           </>
         )}
 
-        {/* RECOMMENDATIONS */}
         {step === "recommendations" && (
           <Recommendations riskLevel={riskLevel} type="menopause" />
         )}

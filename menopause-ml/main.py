@@ -7,25 +7,30 @@ import numpy as np
 # ---------------------------------
 # APP INIT
 # ---------------------------------
-app = FastAPI(title="Menopause ML API")
+app = FastAPI(title="Menopause ML API", version="1.0")
 
 # ---------------------------------
-# CORS (VERY IMPORTANT)
+# CORS CONFIG
 # ---------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change to frontend URL in production
+    allow_origins=["*"],  # change to Vercel URL later
     allow_credentials=True,
-    allow_methods=["*"],  # allows OPTIONS, POST, etc.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ---------------------------------
-# LOAD MODELS
+# LOAD MODEL & TOOLS
 # ---------------------------------
-rf = pickle.load(open("models/rf_model.pkl", "rb"))
-scaler = pickle.load(open("models/scaler.pkl", "rb"))
-le = pickle.load(open("models/label_encoder.pkl", "rb"))
+with open("models/rf_model.pkl", "rb") as f:
+    rf = pickle.load(f)
+
+with open("models/scaler.pkl", "rb") as f:
+    scaler = pickle.load(f)
+
+with open("models/label_encoder.pkl", "rb") as f:
+    le = pickle.load(f)
 
 # ---------------------------------
 # REQUEST SCHEMA
@@ -44,7 +49,7 @@ class MenopauseInput(BaseModel):
     joint_pain: int
 
 # ---------------------------------
-# HEALTH CHECK (OPTIONAL BUT GOOD)
+# HEALTH CHECK
 # ---------------------------------
 @app.get("/")
 def health_check():
@@ -54,7 +59,7 @@ def health_check():
 # PREDICTION ENDPOINT
 # ---------------------------------
 @app.post("/predict-menopause")
-def predict(data: MenopauseInput):
+def predict_menopause(data: MenopauseInput):
     input_vector = np.array([[
         data.age,
         data.estrogen,
@@ -79,5 +84,8 @@ def predict(data: MenopauseInput):
     return {
         "stage": stage,
         "confidence": confidence,
-        "probabilities": dict(zip(le.classes_, probs.tolist()))
+        "probabilities": {
+            cls: round(float(p) * 100, 2)
+            for cls, p in zip(le.classes_, probs)
+        }
     }
