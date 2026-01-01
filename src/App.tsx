@@ -33,6 +33,10 @@ import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
+/* ✅ Education Sub-Pages */
+import PCOSGuide from "./pages/education/PCOSGuide";
+import MenopauseInfo from "./pages/education/MenopauseInfo";
+
 /* Admin Pages */
 import AdminIndex from "./pages/admin/AdminIndex";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
@@ -78,7 +82,11 @@ const App = () => (
             <Route path="/schemes" element={<ProtectedRoute><Schemes /></ProtectedRoute>} />
             <Route path="/health-resources" element={<ProtectedRoute><HealthResources /></ProtectedRoute>} />
             <Route path="/hygiene" element={<ProtectedRoute><Hygiene /></ProtectedRoute>} />
+
+            {/* ✅ Education */}
             <Route path="/education" element={<ProtectedRoute><Education /></ProtectedRoute>} />
+            <Route path="/education/pcos" element={<ProtectedRoute><PCOSGuide /></ProtectedRoute>} />
+            <Route path="/education/menopause" element={<ProtectedRoute><MenopauseInfo /></ProtectedRoute>} />
 
             {/* Admin routes */}
             <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminIndex /></ProtectedRoute>} />

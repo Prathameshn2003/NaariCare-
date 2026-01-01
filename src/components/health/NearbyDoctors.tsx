@@ -1,199 +1,266 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, Star, ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MapPin, Star, Loader2, AlertCircle } from "lucide-react";
+import { haversineDistance, estimateTravelTime } from "../../utils/geo";
 
 interface Doctor {
+  id: string;
   name: string;
-  specialty: string;
+  lat: number;
+  lon: number;
   address: string;
-  rating?: number;
-  distance?: string;
-  placeId: string;
+  distance: number;
 }
 
-interface NearbyDoctorsProps {
-  specialty?: string;
-}
+/* ---------- COMMON FETCH FUNCTION ---------- */
+async function fetchNearbyDoctors(
+  center: { lat: number; lon: number },
+  radiusKm: number
+): Promise<Doctor[]> {
+  const delta = radiusKm / 111;
+  const viewbox = `${center.lon - delta},${center.lat - delta},${center.lon + delta},${center.lat + delta}`;
 
-export const NearbyDoctors = ({ specialty = "gynecologist" }: NearbyDoctorsProps) => {
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=hospital+clinic&limit=30&viewbox=${viewbox}&bounded=1`;
 
-  useEffect(() => {
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (err) => {
-          console.error("Location error:", err);
-          // Default to a major city if location denied
-          setUserLocation({ lat: 28.6139, lng: 77.209 }); // Delhi
-          setError("Location access denied. Showing results for Delhi.");
-        }
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) throw new Error("OSM error");
+
+  const data = await res.json();
+
+  return data
+    .map((item: any) => {
+      const lat = parseFloat(item.lat);
+      const lon = parseFloat(item.lon);
+      const distance = haversineDistance(
+        center.lat,
+        center.lon,
+        lat,
+        lon
       );
-    } else {
-      setUserLocation({ lat: 28.6139, lng: 77.209 });
-      setError("Geolocation not supported. Showing results for Delhi.");
-    }
+
+      return {
+        id: item.place_id,
+        name: item.display_name.split(",")[0],
+        lat,
+        lon,
+        address: item.display_name,
+        distance,
+      };
+    })
+    .filter((d: Doctor) => d.distance <= radiusKm)
+    .sort((a: Doctor, b: Doctor) => a.distance - b.distance);
+}
+
+export const NearbyDoctors = () => {
+  /* ---------- SECTION 1: USER LOCATION ---------- */
+  const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(
+    null
+  );
+  const [nearby, setNearby] = useState<Doctor[]>([]);
+  const [loadingNearby, setLoadingNearby] = useState(true);
+
+  /* ---------- SECTION 2: CITY SEARCH ---------- */
+  const [city, setCity] = useState("");
+  const [radiusKm, setRadiusKm] = useState(20);
+  const [cityResults, setCityResults] = useState<Doctor[]>([]);
+  const [loadingCity, setLoadingCity] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* ---------- GET USER LOCATION ---------- */
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        setUserLoc({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        }),
+      () =>
+        // fallback: Pune
+        setUserLoc({ lat: 18.5204, lon: 73.8567 })
+    );
   }, []);
 
+  /* ---------- AUTO LOAD NEARBY (100 KM) ---------- */
   useEffect(() => {
-    if (!userLocation) return;
+    if (!userLoc) return;
 
-    const searchDoctors = async () => {
-      setLoading(true);
+    const loadNearby = async () => {
       try {
-        // Simulated doctors data based on specialty
-        // In production, this would call Google Places API via edge function
-        const mockDoctors: Doctor[] = [
-          {
-            name: "Dr. Priya Sharma",
-            specialty: "Gynecologist & Obstetrician",
-            address: "Apollo Hospital, Sarita Vihar",
-            rating: 4.8,
-            distance: "2.5 km",
-            placeId: "place1",
-          },
-          {
-            name: "Dr. Anjali Gupta",
-            specialty: "Endocrinologist",
-            address: "Max Healthcare, Saket",
-            rating: 4.6,
-            distance: "4.2 km",
-            placeId: "place2",
-          },
-          {
-            name: "Dr. Meera Kapoor",
-            specialty: "Women's Health Specialist",
-            address: "Fortis Hospital, Vasant Kunj",
-            rating: 4.9,
-            distance: "5.8 km",
-            placeId: "place3",
-          },
-          {
-            name: "Dr. Sunita Reddy",
-            specialty: "Gynecologist",
-            address: "AIIMS, New Delhi",
-            rating: 4.7,
-            distance: "7.1 km",
-            placeId: "place4",
-          },
-        ];
-
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        setDoctors(mockDoctors);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load nearby doctors");
-        setLoading(false);
+        setLoadingNearby(true);
+        const results = await fetchNearbyDoctors(userLoc, 100);
+        setNearby(results);
+      } catch {
+        setNearby([]);
+      } finally {
+        setLoadingNearby(false);
       }
     };
 
-    searchDoctors();
-  }, [userLocation, specialty]);
+    loadNearby();
+  }, [userLoc]);
 
-  const openInMaps = (doctor: Doctor) => {
-    const query = encodeURIComponent(`${doctor.name} ${doctor.address}`);
-    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  /* ---------- CITY SEARCH ---------- */
+  const handleCitySearch = async () => {
+    if (!city.trim()) return;
+
+    try {
+      setError(null);
+      setLoadingCity(true);
+      setCityResults([]);
+
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          city
+        )}`
+      );
+      const geoData = await geoRes.json();
+      if (!geoData.length) throw new Error();
+
+      const center = {
+        lat: parseFloat(geoData[0].lat),
+        lon: parseFloat(geoData[0].lon),
+      };
+
+      const results = await fetchNearbyDoctors(center, radiusKm);
+      setCityResults(results);
+    } catch {
+      setError("City not found or no doctors available.");
+    } finally {
+      setLoadingCity(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="glass-card rounded-2xl p-8 text-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-        <p className="text-muted-foreground">Finding nearby specialists...</p>
-      </div>
-    );
-  }
-
+  /* ---------- UI ---------- */
   return (
-    <div className="glass-card rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-lg bg-teal/20 flex items-center justify-center">
+    <div className="glass-card rounded-xl p-6 space-y-10">
+
+      {/* ========== SECTION 1 ========== */}
+      <section>
+        <h3 className="font-heading text-lg font-semibold mb-3 flex items-center gap-2">
           <MapPin className="w-5 h-5 text-teal" />
-        </div>
-        <div>
-          <h3 className="font-heading text-lg font-semibold text-foreground">
-            Nearby Women's Health Specialists
-          </h3>
+          Nearby Healthcare Providers (Near You)
+        </h3>
+
+        {loadingNearby ? (
+          <Loader2 className="w-6 h-6 animate-spin" />
+        ) : nearby.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Consult with qualified professionals
+            No nearby healthcare providers within 100 km.
           </p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-2 text-sm text-accent mb-4 p-3 bg-accent/10 rounded-lg">
-          <AlertCircle className="w-4 h-4" />
-          {error}
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {doctors.map((doctor) => (
-          <div
-            key={doctor.placeId}
-            className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h4 className="font-semibold text-foreground">{doctor.name}</h4>
-                <p className="text-sm text-primary">{doctor.specialty}</p>
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {doctor.address}
-                </p>
-                <div className="flex items-center gap-4 mt-2">
-                  {doctor.rating && (
-                    <span className="flex items-center gap-1 text-sm text-accent">
-                      <Star className="w-3 h-3 fill-current" />
-                      {doctor.rating}
-                    </span>
-                  )}
-                  {doctor.distance && (
-                    <span className="text-sm text-muted-foreground">
-                      {doctor.distance}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openInMaps(doctor)}
-                className="shrink-0"
-              >
-                <ExternalLink className="w-4 h-4 mr-1" />
-                Open Map
-              </Button>
-            </div>
+        ) : (
+          <div className="space-y-4">
+            {nearby.slice(0, 5).map((doc, index) => (
+              <DoctorCard
+                key={doc.id}
+                doc={doc}
+                index={index}
+                origin={userLoc!}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </section>
 
-      <div className="mt-6 pt-4 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full"
-          onClick={() =>
-            window.open(
-              `https://www.google.com/maps/search/${specialty}+near+me`,
-              "_blank"
-            )
-          }
-        >
-          View More on Google Maps
-          <ExternalLink className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
+      {/* ========== SECTION 2 ========== */}
+      <section>
+        <h3 className="font-heading text-lg font-semibold mb-3">
+          Search Doctors by City
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <Input
+            placeholder="Enter city (e.g. Pune)"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            value={radiusKm}
+            onChange={(e) => setRadiusKm(Number(e.target.value))}
+            placeholder="Radius (km)"
+          />
+          <Button onClick={handleCitySearch}>Search</Button>
+        </div>
+
+        {error && (
+          <div className="text-sm text-accent flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            {error}
+          </div>
+        )}
+
+        {loadingCity && <Loader2 className="w-6 h-6 animate-spin" />}
+
+        {!loadingCity && cityResults.length > 0 && (
+          <div className="space-y-4">
+            {cityResults.slice(0, 5).map((doc, index) => (
+              <DoctorCard
+                key={doc.id}
+                doc={doc}
+                index={index}
+                origin={doc}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <p className="text-xs text-muted-foreground">
+        This information is for guidance only. Please verify before visiting.
+      </p>
     </div>
   );
 };
+
+/* ---------- CARD ---------- */
+const DoctorCard = ({
+  doc,
+  index,
+  origin,
+}: {
+  doc: Doctor;
+  index: number;
+  origin: { lat: number; lon: number };
+}) => (
+  <div className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition">
+    <div className="flex justify-between gap-4">
+      <div>
+        <h4 className="font-semibold">
+          {doc.name}
+          {index === 0 && (
+            <span className="ml-2 text-accent inline-flex items-center gap-1">
+              <Star className="w-3 h-3 fill-current" />
+              Nearest
+            </span>
+          )}
+        </h4>
+        <p className="text-sm text-muted-foreground line-clamp-2">
+          {doc.address}
+        </p>
+        <p className="text-sm mt-1">
+          📍 {doc.distance.toFixed(1)} km • ⏱{" "}
+          {estimateTravelTime(doc.distance)} min
+        </p>
+      </div>
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          window.open(
+            `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.lat},${origin.lon};${doc.lat},${doc.lon}`,
+            "_blank"
+          )
+        }
+      >
+        View Route
+      </Button>
+    </div>
+  </div>
+);
