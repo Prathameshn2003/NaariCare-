@@ -6,7 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 // Define admin emails - ONLY these users can access admin routes
 const ADMIN_EMAILS = [
   "nprathamesh519@gmail.com",
-  "samugadadare26@gmail.com"
+  "samugadadare26@gmail.com",
+  "devikanimbalkar9595@gmail.com"
 ];
 
 interface AuthContextType {
