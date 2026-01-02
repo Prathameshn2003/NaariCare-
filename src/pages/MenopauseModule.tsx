@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { RiskGauge } from "@/components/health/RiskGauge";
+import { RiskChart } from "@/components/health/RiskChart";
 import { HealthDisclaimer } from "@/components/health/HealthDisclaimer";
 import { Thermometer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { toast } from "@/hooks/use-toast";
 /* ---------------- TYPES ---------------- */
 type RiskLevel = "low" | "medium" | "high";
 
-/* ---------------- API (FINAL FIX) ---------------- */
+/* ---------------- API ---------------- */
 const MENOPAUSE_API = import.meta.env.VITE_MENOPAUSE_API_URL;
 
 if (!MENOPAUSE_API) {
@@ -144,6 +145,7 @@ export default function MenopauseModule() {
           Menopause Detection & Assessment
         </h1>
 
+        {/* -------- FORM -------- */}
         <div className="space-y-4">
           {[
             ["Age (years)", "age"],
@@ -193,12 +195,43 @@ export default function MenopauseModule() {
           Predict Menopause Risk
         </Button>
 
+        {/* -------- RESULTS -------- */}
         {result && (
-          <div className="mt-10 space-y-6">
+          <div className="mt-10 space-y-8">
             <RiskGauge
               score={result.confidence ?? score}
               label="Menopause Risk"
               color={gaugeColor}
+            />
+
+            <RiskChart
+              factors={[
+                {
+                  name: "Hormones",
+                  value:
+                    (form.estrogen < 50 ? 1 : 0) +
+                    (form.fsh >= 25 ? 1 : 0),
+                  maxValue: 2,
+                },
+                {
+                  name: "Cycle",
+                  value:
+                    (form.irregular_periods === "Yes" ? 1 : 0) +
+                    (form.missed_periods === "Yes" ? 1 : 0),
+                  maxValue: 2,
+                },
+                {
+                  name: "Symptoms",
+                  value: [
+                    form.hot_flashes,
+                    form.night_sweats,
+                    form.sleep_problems,
+                    form.vaginal_dryness,
+                    form.joint_pain,
+                  ].filter((v) => v === "Yes").length,
+                  maxValue: 5,
+                },
+              ]}
             />
           </div>
         )}
