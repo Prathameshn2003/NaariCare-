@@ -4,67 +4,78 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { RiskGauge } from "@/components/health/RiskGauge";
 import { HealthDisclaimer } from "@/components/health/HealthDisclaimer";
-import { Recommendations } from "@/components/health/Recommendations";
-import { Thermometer, Heart } from "lucide-react";
+import { Thermometer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
 /* ---------------- TYPES ---------------- */
-type Step = "education" | "questionnaire" | "results" | "recommendations";
 type RiskLevel = "low" | "medium" | "high";
 
 /* ---------------- API (FINAL FIX) ---------------- */
-/**
- * ✔ Production (Vercel)  → Railway
- * ✔ Local development    → localhost
- */
-const MENOPAUSE_API = import.meta.env.PROD
-  ? "https://menopause-ml-production.up.railway.app"
-  : import.meta.env.VITE_MENOPAUSE_API_URL || "http://localhost:8000";
+const MENOPAUSE_API = import.meta.env.VITE_MENOPAUSE_API_URL;
+
+if (!MENOPAUSE_API) {
+  console.error("❌ VITE_MENOPAUSE_API_URL is missing");
+}
 
 /* ---------------- ML CALL ---------------- */
-async function predictMenopauseML(payload: Record<string, number>) {
-  console.log("Calling Menopause API:", MENOPAUSE_API);
-
+async function predictMenopause(payload: any) {
   const res = await fetch(`${MENOPAUSE_API}/predict-menopause`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Prediction failed (${res.status}): ${err}`);
-  }
-
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Prediction failed");
+  return data;
 }
-
-/* ---------------- QUESTIONS ---------------- */
-const questions = [
-  { id: 1, text: "What is your current age?", options: ["Under 40", "40–45", "46–50", "51+"] },
-  { id: 2, text: "How regular are your periods?", options: ["Regular", "Slightly irregular", "Irregular", "Stopped"] },
-  { id: 3, text: "Hot flashes or night sweats?", options: ["Never", "Occasional", "Frequent", "Daily"] },
-  { id: 4, text: "Sleep quality?", options: ["Good", "Sometimes poor", "Often poor", "Severe insomnia"] },
-  { id: 5, text: "Mood changes?", options: ["None", "Mild", "Moderate", "Severe"] },
-  { id: 6, text: "Vaginal dryness?", options: ["None", "Occasional", "Frequent", "Constant"] },
-  { id: 7, text: "Joint pain?", options: ["None", "Occasional", "Regular", "Severe"] },
-];
 
 /* ---------------- COMPONENT ---------------- */
 export default function MenopauseModule() {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
-  const [step, setStep] = useState<Step>("education");
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [qIndex, setQIndex] = useState(0);
+  const [form, setForm] = useState({
+    age: 36,
+    estrogen: 40,
+    fsh: 20,
+    years_since_last_period: 0.2,
+    irregular_periods: "No",
+    missed_periods: "No",
+    hot_flashes: "No",
+    night_sweats: "No",
+    sleep_problems: "No",
+    vaginal_dryness: "No",
+    joint_pain: "No",
+  });
 
-  /* ---------------- SCORE ---------------- */
+  const update = (k: string, v: any) =>
+    setForm((p) => ({ ...p, [k]: v }));
+
+  /* ---------------- FALLBACK SCORE ---------------- */
   const score = useMemo(() => {
-    const total = Object.values(answers).reduce((a, b) => a + b, 0);
-    return Math.round((total / (questions.length * 3)) * 100);
-  }, [answers]);
+    let s = 0;
+    if (form.age >= 45) s += 20;
+    if (form.estrogen < 50) s += 20;
+    if (form.fsh >= 25) s += 20;
+
+    [
+      "irregular_periods",
+      "missed_periods",
+      "hot_flashes",
+      "night_sweats",
+      "sleep_problems",
+      "vaginal_dryness",
+      "joint_pain",
+    ].forEach((k) => {
+      if ((form as any)[k] === "Yes") s += 5;
+    });
+
+    return Math.min(s, 100);
+  }, [form]);
 
   const riskLevel: RiskLevel =
     score < 30 ? "low" : score < 60 ? "medium" : "high";
@@ -76,53 +87,49 @@ export default function MenopauseModule() {
       ? "text-accent"
       : "text-primary";
 
-  /* ---------------- ANSWER HANDLER ---------------- */
-  const handleAnswer = async (value: number) => {
+  /* ---------------- SUBMIT ---------------- */
+  const assess = async () => {
     if (!user) {
       toast({ title: "Please login first", variant: "destructive" });
       return;
     }
 
-    const currentQuestionId = questions[qIndex].id;
-    const nextAnswers = { ...answers, [currentQuestionId]: value };
-    setAnswers(nextAnswers);
-
-    if (qIndex < questions.length - 1) {
-      setQIndex(qIndex + 1);
-      return;
-    }
-
-    setStep("results");
-
+    setLoading(true);
     try {
-      const result = await predictMenopauseML({
-        age: nextAnswers[1] ?? 48,
-        estrogen: 40,
-        fsh: 20,
-        years_since_last_period: nextAnswers[2] === 3 ? 1.2 : 0.2,
-        irregular_periods: nextAnswers[2] >= 2 ? 1 : 0,
-        missed_periods: nextAnswers[2] === 3 ? 1 : 0,
-        hot_flashes: nextAnswers[3] >= 2 ? 1 : 0,
-        night_sweats: nextAnswers[3] >= 2 ? 1 : 0,
-        sleep_problems: nextAnswers[4] >= 2 ? 1 : 0,
-        vaginal_dryness: nextAnswers[6] >= 2 ? 1 : 0,
-        joint_pain: nextAnswers[7] >= 2 ? 1 : 0,
-      });
+      const payload = {
+        age: form.age,
+        estrogen: form.estrogen,
+        fsh: form.fsh,
+        years_since_last_period: form.years_since_last_period,
+        irregular_periods: form.irregular_periods === "Yes" ? 1 : 0,
+        missed_periods: form.missed_periods === "Yes" ? 1 : 0,
+        hot_flashes: form.hot_flashes === "Yes" ? 1 : 0,
+        night_sweats: form.night_sweats === "Yes" ? 1 : 0,
+        sleep_problems: form.sleep_problems === "Yes" ? 1 : 0,
+        vaginal_dryness: form.vaginal_dryness === "Yes" ? 1 : 0,
+        joint_pain: form.joint_pain === "Yes" ? 1 : 0,
+      };
 
-      const { error } = await supabase.from("health_assessments").insert({
+      const res = await predictMenopause(payload);
+      setResult(res);
+
+      await supabase.from("health_assessments").insert({
         user_id: user.id,
         assessment_type: "menopause",
-        risk_score: result.confidence,
+        risk_score: res.confidence ?? score,
         risk_category: riskLevel,
-        responses: nextAnswers,
+        responses: form,
       });
 
-      if (error) throw error;
-
-      toast({ title: "Assessment completed successfully" });
-    } catch (err) {
-      console.error(err);
-      toast({ title: "Prediction failed", variant: "destructive" });
+      toast({ title: "Menopause assessment completed" });
+    } catch (e: any) {
+      toast({
+        title: "Prediction failed",
+        description: e.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,63 +138,72 @@ export default function MenopauseModule() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="pt-32 pb-16 max-w-3xl mx-auto px-4">
-        {step === "education" && (
-          <div className="text-center py-16">
-            <Thermometer className="w-14 h-14 mx-auto text-teal" />
-            <h1 className="text-3xl font-bold mt-4">
-              Menopause Health Assessment
-            </h1>
-            <Button className="mt-6" onClick={() => setStep("questionnaire")}>
-              <Heart className="mr-2 h-4 w-4" /> Start Assessment
-            </Button>
-            <HealthDisclaimer />
-          </div>
-        )}
+      <main className="pt-24 pb-16 max-w-3xl mx-auto px-4">
+        <h1 className="text-3xl font-bold mb-6 flex items-center gap-2">
+          <Thermometer className="text-accent" />
+          Menopause Detection & Assessment
+        </h1>
 
-        {step === "questionnaire" && (
-          <>
-            <h2 className="text-xl font-bold mb-6">
-              {questions[qIndex].text}
-            </h2>
-            {questions[qIndex].options.map((opt, i) => (
-              <Button
-                key={i}
-                className="w-full mb-3"
-                onClick={() => handleAnswer(i)}
-              >
-                {opt}
-              </Button>
-            ))}
-          </>
-        )}
+        <div className="space-y-4">
+          {[
+            ["Age (years)", "age"],
+            ["Estrogen Level", "estrogen"],
+            ["FSH Level", "fsh"],
+            ["Years Since Last Period", "years_since_last_period"],
+          ].map(([l, k]) => (
+            <div key={k}>
+              <label className="text-sm">{l}</label>
+              <input
+                type="number"
+                value={(form as any)[k]}
+                onChange={(e) => update(k, Number(e.target.value))}
+                className="w-full rounded-md border px-3 py-2 no-spinner"
+              />
+            </div>
+          ))}
 
-        {step === "results" && (
-          <>
+          {[
+            ["Irregular Periods", "irregular_periods"],
+            ["Missed Periods", "missed_periods"],
+            ["Hot Flashes", "hot_flashes"],
+            ["Night Sweats", "night_sweats"],
+            ["Sleep Problems", "sleep_problems"],
+            ["Vaginal Dryness", "vaginal_dryness"],
+            ["Joint Pain", "joint_pain"],
+          ].map(([l, k]) => (
+            <div key={k}>
+              <label className="text-sm">{l}</label>
+              <div className="flex gap-6 mt-1">
+                {["No", "Yes"].map((v) => (
+                  <label key={v} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={(form as any)[k] === v}
+                      onChange={() => update(k, v)}
+                    />
+                    {v}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Button className="w-full mt-6" onClick={assess} disabled={loading}>
+          Predict Menopause Risk
+        </Button>
+
+        {result && (
+          <div className="mt-10 space-y-6">
             <RiskGauge
-              score={score}
+              score={result.confidence ?? score}
               label="Menopause Risk"
               color={gaugeColor}
             />
-
-            <div className="mt-4 p-4 rounded-xl bg-muted/60 text-center">
-              {riskLevel === "low" && <p className="text-teal">Low risk – mild symptoms</p>}
-              {riskLevel === "medium" && <p className="text-accent">Moderate risk – consult a doctor</p>}
-              {riskLevel === "high" && <p className="text-primary">High risk – medical advice recommended</p>}
-            </div>
-
-            <Button
-              className="mt-6 w-full"
-              onClick={() => setStep("recommendations")}
-            >
-              View Recommendations
-            </Button>
-          </>
+          </div>
         )}
 
-        {step === "recommendations" && (
-          <Recommendations riskLevel={riskLevel} type="menopause" />
-        )}
+        <HealthDisclaimer />
       </main>
 
       <Footer />
